@@ -17,9 +17,9 @@
 ## Feature Summary
 - Total rows: **12000**
 - Anomalies: **960** (8.00%)
-- Amount mean / P95 / P99: **41532.24 / 106243.76 / 199680.85**
+- Amount mean / P95 / P99: **148.33 / 379.44 / 713.15**
 - Avg velocity (normal vs anomaly): **4.35 vs 10.31**
-- Avg amount (normal vs anomaly): **36579.48 vs 98489.01**
+- Avg amount (normal vs anomaly): **130.64 vs 351.75**
 - New beneficiary rate (normal vs anomaly): **13.75% vs 45.00%**
 - Risky device rate (normal vs anomaly): **14.26% vs 53.96%**
 - Different-city rate (normal vs anomaly): **11.41% vs 34.06%**

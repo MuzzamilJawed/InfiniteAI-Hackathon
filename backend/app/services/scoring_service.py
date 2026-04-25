@@ -58,11 +58,16 @@ class ScoringService:
         band = _band_for(risk_score)
         action = _action_for(band)
 
+        feature_snapshot = feature_frame.iloc[0].to_dict()
         explanation = build_explanation(
             hits=hits,
             feature_importance=ml_result.feature_importance,
             risk_score=risk_score,
             risk_band=band,
+            action=action,
+            tx=tx,
+            baseline=baseline,
+            feature_snapshot=feature_snapshot,
         )
         compliance = compliance_metadata(tx, hits)
 
@@ -77,7 +82,7 @@ class ScoringService:
             action=action,
             reason_codes=hits_to_reason_codes(hits),
             explanation=explanation,
-            feature_snapshot=feature_frame.iloc[0].to_dict(),
+            feature_snapshot=feature_snapshot,
             compliance=compliance,
         )
 

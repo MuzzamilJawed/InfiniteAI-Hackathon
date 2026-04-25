@@ -67,10 +67,37 @@ export interface ReasonCode {
   weight: number;
 }
 
+export type EvidenceCategory =
+  | "Amount"
+  | "Time"
+  | "Location"
+  | "Device"
+  | "Channel"
+  | "Velocity"
+  | "Beneficiary"
+  | "Compliance"
+  | "Behavior"
+  | "Model";
+
+export type Severity = "info" | "low" | "medium" | "high" | "critical";
+
+export interface Evidence {
+  category: EvidenceCategory;
+  severity: Severity;
+  title: string;
+  detail: string;
+  observed?: string | null;
+  expected?: string | null;
+}
+
 export interface Explanation {
   analyst: string;
   customer: string;
   top_factors: string[];
+  headline?: string | null;
+  narrative?: string | null;
+  recommended_action?: string | null;
+  evidence?: Evidence[];
 }
 
 export interface TransactionDecision {

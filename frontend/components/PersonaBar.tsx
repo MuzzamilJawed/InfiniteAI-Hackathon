@@ -2,6 +2,7 @@
 
 import { PERSONAS } from "@/lib/personas";
 import { usePersona } from "@/components/PersonaPicker";
+import { useAuth } from "@/context/AuthContext";
 import { motion } from "framer-motion";
 
 const RISK_DOT: Record<string, string> = {
@@ -13,10 +14,14 @@ const RISK_DOT: Record<string, string> = {
 
 export function PersonaBar() {
   const [active, setActive] = usePersona();
+  const { user } = useAuth();
+
+  const visible = PERSONAS.filter((p) => !p.owner || p.owner === user?.email);
+
   return (
     <div className="flex items-center gap-2 flex-wrap mb-4">
       <span className="text-xs text-[var(--foreground)]/55 mr-1">Persona:</span>
-      {PERSONAS.map((p) => (
+      {visible.map((p) => (
         <motion.button
           key={p.id}
           type="button"

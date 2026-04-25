@@ -6,14 +6,16 @@ export interface Persona {
   description: string;
   defaults: Partial<ScoreRequest>;
   riskHint: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  owner?: string;
 }
 
 export const PERSONAS: Persona[] = [
   {
-    id: "trusted_karachi",
-    label: "Trusted Karachi user",
-    description: "Long history, trusted device, medium KYC, predictable spend.",
+    id: "customer1",
+    label: "Customer 1 — Karachi",
+    description: "Karachi-based account, medium KYC, trusted device, healthy history.",
     riskHint: "LOW",
+    owner: "customer1@fraudentify.pk",
     defaults: {
       customer_id: "C00123",
       home_city: "Karachi",
@@ -26,40 +28,29 @@ export const PERSONAS: Persona[] = [
     },
   },
   {
-    id: "new_lahore",
-    label: "New Lahore user",
-    description: "Low KYC, limited history, more sensitive to anomalies.",
-    riskHint: "MEDIUM",
+    id: "customer2",
+    label: "Customer 2 — Lahore",
+    description: "Established Lahore customer, high KYC, trusted device, moderate spend.",
+    riskHint: "LOW",
+    owner: "customer2@fraudentify.pk",
     defaults: {
-      customer_id: "C00777",
+      customer_id: "C00456",
       home_city: "Lahore",
       city: "Lahore",
-      device: "new_device",
-      kyc_tier: "low",
-      avg_user_amount: 1500,
-      tx_velocity: 1,
-      tx_history: 22,
-    },
-  },
-  {
-    id: "drift_quetta",
-    label: "Drift user (Quetta)",
-    description:
-      "Sudden behavior change, large amounts on emulated device, off-pattern.",
-    riskHint: "HIGH",
-    defaults: {
-      customer_id: "C00911",
-      home_city: "Karachi",
-      city: "Quetta",
-      device: "emulated_device",
-      kyc_tier: "low",
-      avg_user_amount: 1800,
-      tx_velocity: 22,
-      tx_history: 35,
+      device: "trusted_device",
+      kyc_tier: "high",
+      avg_user_amount: 6000,
+      tx_velocity: 5,
+      tx_history: 420,
     },
   },
 ];
 
 export function findPersona(id: string): Persona | undefined {
   return PERSONAS.find((p) => p.id === id);
+}
+
+export function findPersonaForUser(email?: string | null): Persona | undefined {
+  if (!email) return undefined;
+  return PERSONAS.find((p) => p.owner === email);
 }

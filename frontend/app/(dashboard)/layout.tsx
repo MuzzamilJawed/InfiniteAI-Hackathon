@@ -18,20 +18,31 @@ import {
   X,
   Loader2,
 } from "lucide-react";
-import { useAuth, useRequireAuth } from "@/context/AuthContext";
+import { useAuth, useRequireAuth, type UserRole } from "@/context/AuthContext";
 import { recentDecisions } from "@/lib/api";
+import { Logo } from "@/components/Logo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
-const NAV_ITEMS = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  exact?: boolean;
+  roles: UserRole[];
+}
+
+const NAV_ITEMS: NavItem[] = [
   {
     href: "/dashboard",
     label: "Dashboard",
     icon: LayoutDashboard,
     exact: true,
+    roles: ["analyst", "customer"],
   },
-  { href: "/dashboard/card-payment", label: "Card Payment", icon: CreditCard },
-  { href: "/dashboard/online-payment", label: "Online Payment", icon: Smartphone },
-  { href: "/dashboard/atm", label: "ATM Withdrawal", icon: Banknote },
-  { href: "/dashboard/confirm", label: "Security Alerts", icon: ShieldAlert },
+  { href: "/dashboard/card-payment", label: "Card Payment", icon: CreditCard, roles: ["customer"] },
+  { href: "/dashboard/online-payment", label: "Online Payment", icon: Smartphone, roles: ["customer"] },
+  { href: "/dashboard/atm", label: "ATM Withdrawal", icon: Banknote, roles: ["customer"] },
+  { href: "/dashboard/confirm", label: "Security Alerts", icon: ShieldAlert, roles: ["analyst", "customer"] },
 ];
 
 export default function DashboardLayout({
@@ -84,34 +95,30 @@ export default function DashboardLayout({
   const sidebarContent = (
     <div className="flex flex-col h-full">
       <div
-        className={`flex items-center gap-3 px-4 py-5 border-b border-[var(--border)] ${
-          collapsed ? "justify-center" : ""
-        }`}
+        className={`flex items-center gap-3 px-4 py-5 border-b border-[var(--border)] ${collapsed ? "justify-center" : ""
+          }`}
       >
-        <div className="size-9 rounded-xl brand-gradient grid place-items-center text-white font-bold shrink-0">
-          S
-        </div>
+        <Logo size={36} />
         {!collapsed && (
           <div className="min-w-0">
-            <div className="font-semibold text-sm leading-tight truncate">SafeBank PK</div>
+            <div className="font-semibold text-sm leading-tight truncate">fraudentify</div>
             <div className="text-[11px] text-[var(--foreground)]/55">Anomaly Detector</div>
           </div>
         )}
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {NAV_ITEMS.map(({ href, label, icon: Icon, exact }) => {
+        {NAV_ITEMS.filter((item) => item.roles.includes(user!.role)).map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href);
           return (
             <Link
               key={href}
               href={href}
               onClick={() => setMobileOpen(false)}
-              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
-                active
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${active
                   ? "brand-gradient text-white"
                   : "hover:bg-[var(--surface-muted)] text-[var(--foreground)]/75 hover:text-[var(--foreground)]"
-              } ${collapsed ? "justify-center" : ""}`}
+                } ${collapsed ? "justify-center" : ""}`}
             >
               <Icon className="size-5 shrink-0" />
               {!collapsed && <span className="truncate">{label}</span>}
@@ -137,9 +144,8 @@ export default function DashboardLayout({
         <button
           type="button"
           onClick={handleLogout}
-          className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-red-600 hover:bg-red-500/10 transition-colors ${
-            collapsed ? "justify-center" : ""
-          }`}
+          className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-red-600 hover:bg-red-500/10 transition-colors ${collapsed ? "justify-center" : ""
+            }`}
         >
           <LogOut className="size-4 shrink-0" />
           {!collapsed && "Sign out"}
@@ -247,6 +253,8 @@ export default function DashboardLayout({
               </AnimatePresence>
             </div>
 
+            <ThemeToggle />
+
             {/* Live pulse indicator */}
             <div className="hidden sm:flex items-center gap-1.5 text-[10px] text-emerald-600 font-medium">
               <span className="relative flex size-2">
@@ -268,7 +276,7 @@ export default function DashboardLayout({
         </main>
 
         <footer className="px-6 py-2 text-[10px] text-[var(--foreground)]/40 border-t border-[var(--border)] shrink-0">
-          SafeBank PK · SBP-aligned AML/CFT monitoring · InfiniteAI Hackathon 2026
+          fraudentify · SBP-aligned AML/CFT monitoring · InfiniteAI Hackathon 2026
         </footer>
       </div>
     </div>
@@ -283,6 +291,6 @@ function PageTitle({ pathname }: { pathname: string }) {
     "/dashboard/atm": "ATM Withdrawal",
     "/dashboard/confirm": "Security Alerts",
   };
-  const title = map[pathname] ?? "SafeBank PK";
+  const title = map[pathname] ?? "fraudentify";
   return <h1 className="text-sm font-semibold truncate">{title}</h1>;
 }

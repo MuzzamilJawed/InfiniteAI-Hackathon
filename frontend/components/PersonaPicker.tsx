@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ShieldCheck, AlertTriangle, ShieldAlert } from "lucide-react";
-import { PERSONAS, type Persona } from "@/lib/personas";
+import { PERSONAS, findPersonaForUser, type Persona } from "@/lib/personas";
+import { useAuth } from "@/context/AuthContext";
 
 const RISK_ICON = {
   LOW: ShieldCheck,
@@ -19,18 +20,26 @@ const RISK_COLOR = {
   CRITICAL: "text-red-600",
 } as const;
 
-const STORAGE_KEY = "safebank_persona_v1";
+const STORAGE_KEY = "fraudentify_persona_v1";
 
 export function usePersona(): [Persona, (id: string) => void] {
+  const { user } = useAuth();
   const [active, setActive] = useState<Persona>(PERSONAS[0]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
+    // Prefer the persona owned by the logged-in user
+    const ownByUser = findPersonaForUser(user?.email);
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const found = PERSONAS.find((p) => p.id === stored);
-      if (found) setActive(found);
+    const storedPersona = stored ? PERSONAS.find((p) => p.id === stored) : undefined;
+    // If stored persona belongs to current user, keep it; otherwise switch to user's own
+    if (storedPersona && (!storedPersona.owner || storedPersona.owner === user?.email)) {
+      setActive(storedPersona);
+    } else if (ownByUser) {
+      setActive(ownByUser);
     }
-  }, []);
+  }, [user?.email]);
+
   const update = (id: string) => {
     const next = PERSONAS.find((p) => p.id === id);
     if (!next) return;
@@ -61,11 +70,10 @@ export function PersonaPicker({ active, onChange }: Props) {
             whileHover={{ y: -2 }}
             whileTap={{ scale: 0.99 }}
             onClick={() => onChange(p.id)}
-            className={`text-left glass card-shadow rounded-2xl p-4 border transition-colors ${
-              isActive
+            className={`text-left glass card-shadow rounded-2xl p-4 border transition-colors ${isActive
                 ? "border-[var(--brand)] ring-2 ring-[var(--brand)]/30"
                 : "border-[var(--border)] hover:border-[var(--brand)]/60"
-            }`}
+              }`}
           >
             <div className="flex items-center justify-between">
               <span className="text-xs uppercase tracking-wider text-[var(--foreground)]/60">

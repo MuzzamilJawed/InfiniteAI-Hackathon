@@ -69,6 +69,11 @@ PAKISTAN_HOLIDAYS_2025 = {
     (12, 25),
 }
 
+# All amount-bearing fields (`amount`, `avg_user_amount`, `amount_deviation`)
+# are produced in USD-scale internally for proportional realism, then scaled
+# to PKR at the end. 1 USD ≈ 280 PKR (rough 2025-2026 reference rate).
+USD_TO_PKR = 280.0
+
 
 @dataclass
 class UserProfile:
@@ -293,71 +298,101 @@ def normal_tx(p: UserProfile, idx: int, total: int, ts: datetime) -> dict:
     }
 
 
+def _inject_amount_spike(r: pd.Series, profile: UserProfile | None) -> pd.Series:
+    """Subtype 1: Large amount spike (3-10x baseline)."""
+    avg = float(r["avg_user_amount"])
+    r["amount"] = round(clip(avg * np.random.uniform(3.0, 10.0), 20.0, 25000.0), 2)
+    r["amount_deviation"] = round(float(r["amount"]) - avg, 2)
+    if random.random() < 0.4:
+        r["new_beneficiary"] = 1
+    return r
+
+
+def _inject_location_anomaly(r: pd.Series, profile: UserProfile | None) -> pd.Series:
+    """Subtype 2: Different city + risky device, normal amount."""
+    if profile is not None:
+        other = [c for c in PAKISTAN_CITIES if c != profile.home_city]
+        r["city"] = random.choice(other)
+        r["location"] = "different_city"
+    r["device"] = "new_device" if random.random() < 0.5 else "emulated_device"
+    if random.random() < 0.35:
+        r["channel"] = random.choice(["ATM", "POS"])
+    return r
+
+
+def _inject_velocity_burst(r: pd.Series, profile: UserProfile | None) -> pd.Series:
+    """Subtype 3: High velocity burst, possibly off-hours, normal amount."""
+    r["tx_velocity"] = int(np.random.randint(15, 45))
+    if random.random() < 0.65:
+        try:
+            ts = datetime.fromisoformat(str(r["timestamp"]))
+            ts = ts.replace(hour=random.choice([0, 1, 2, 3, 4, 23]))
+            r["timestamp"] = ts.isoformat()
+            r["hour"] = ts.hour
+        except Exception:
+            pass
+    if random.random() < 0.5:
+        r["new_beneficiary"] = 1
+    return r
+
+
+def _inject_channel_device(r: pd.Series, profile: UserProfile | None) -> pd.Series:
+    """Subtype 4: Risky channel + risky device + off-hours, near-normal amount."""
+    r["channel"] = random.choice(["ATM", "P2P", "Cash"])
+    r["device"] = "new_device" if random.random() < 0.55 else "emulated_device"
+    r["merchant_category"] = random.choice(["Cash", "P2P", "Electronics"])
+    try:
+        ts = datetime.fromisoformat(str(r["timestamp"]))
+        ts = ts.replace(hour=random.choice([0, 1, 2, 3, 4, 5, 23]))
+        r["timestamp"] = ts.isoformat()
+        r["hour"] = ts.hour
+    except Exception:
+        pass
+    avg = float(r["avg_user_amount"])
+    r["amount"] = round(clip(avg * np.random.uniform(0.8, 1.5), 5.0, 8000.0), 2)
+    r["amount_deviation"] = round(float(r["amount"]) - avg, 2)
+    return r
+
+
+def _inject_behavioral_drift(r: pd.Series, profile: UserProfile | None) -> pd.Series:
+    """Subtype 5: Multiple moderate signals — slightly elevated amount + diff city + new beneficiary."""
+    avg = float(r["avg_user_amount"])
+    r["amount"] = round(clip(avg * np.random.uniform(1.5, 2.8), 10.0, 12000.0), 2)
+    r["amount_deviation"] = round(float(r["amount"]) - avg, 2)
+    r["new_beneficiary"] = 1
+    if profile is not None and random.random() < 0.6:
+        other = [c for c in PAKISTAN_CITIES if c != profile.home_city]
+        r["city"] = random.choice(other)
+        r["location"] = "different_city"
+    if random.random() < 0.45:
+        r["device"] = "new_device"
+    r["tx_velocity"] = int(max(float(r["tx_velocity"]), np.random.randint(6, 15)))
+    return r
+
+
+ANOMALY_SUBTYPES = [
+    (_inject_amount_spike, 0.25),
+    (_inject_location_anomaly, 0.20),
+    (_inject_velocity_burst, 0.20),
+    (_inject_channel_device, 0.20),
+    (_inject_behavioral_drift, 0.15),
+]
+
+
 def inject_anomalies(df: pd.DataFrame, ratio: float, profiles: dict[int, UserProfile]) -> pd.DataFrame:
+    """Inject anomalies in USD-scale (caller is responsible for PKR conversion)."""
     n = max(1, int(round(len(df) * ratio)))
     idxs = np.random.choice(np.arange(len(df)), size=n, replace=False)
     df.loc[idxs, "is_anomaly"] = 1
-    drift_users = set(
-        np.random.choice(
-            df["user_id"].unique(),
-            size=max(1, int(df["user_id"].nunique() * 0.06)),
-            replace=False,
-        )
-    )
-    for i in idxs:
+
+    fns, weights = zip(*ANOMALY_SUBTYPES)
+    subtypes = random.choices(range(len(fns)), weights=weights, k=n)
+
+    for i, st in zip(idxs, subtypes):
         r = df.loc[i].copy()
         uid = int(r["user_id"])
         profile = profiles.get(uid)
-
-        r["amount"] = round(
-            clip(float(r["avg_user_amount"]) * np.random.uniform(3.0, 10.0), 20.0, 25000.0),
-            2,
-        )
-        r["tx_velocity"] = int(
-            max(
-                float(r["tx_velocity"]),
-                round(
-                    np.random.randint(8, 40)
-                    * (1.0 + min(float(r["tx_history"]) / 1200.0, 1.5))
-                ),
-            )
-        )
-        if random.random() < 0.82:
-            r["new_beneficiary"] = 1
-        if random.random() < 0.78:
-            r["device"] = "new_device" if random.random() < 0.6 else "emulated_device"
-        if random.random() < 0.72 and profile is not None:
-            other_cities = [c for c in PAKISTAN_CITIES if c != profile.home_city]
-            r["city"] = random.choice(other_cities)
-            r["location"] = "different_city"
-
-        if random.random() < 0.6:
-            try:
-                ts = datetime.fromisoformat(str(r["timestamp"]))
-                ts = ts.replace(hour=random.choice([0, 1, 2, 3, 4, 23]))
-                r["timestamp"] = ts.isoformat()
-                r["hour"] = ts.hour
-            except Exception:
-                pass
-
-        if random.random() < 0.55:
-            r["channel"] = random.choice(["ATM", "P2P", "Cash", "JazzCash", "Easypaisa"])
-        if random.random() < 0.5:
-            r["merchant_category"] = random.choice(["Cash", "P2P", "Electronics", "Travel"])
-
-        if uid in drift_users and random.random() < 0.75:
-            r["avg_user_amount"] = round(
-                clip(float(r["avg_user_amount"]) * np.random.uniform(1.8, 3.8), 6.0, 9000.0),
-                2,
-            )
-            if random.random() < 0.65:
-                r["device"] = "emulated_device"
-
-        r["amount_deviation"] = round(float(r["amount"]) - float(r["avg_user_amount"]), 2)
-        min_dev = float(r["avg_user_amount"]) * np.random.uniform(2.5, 6.5)
-        if float(r["amount_deviation"]) < min_dev:
-            r["amount"] = round(float(r["avg_user_amount"]) + min_dev, 2)
-            r["amount_deviation"] = round(min_dev, 2)
+        r = fns[st](r, profile)
         df.loc[i] = r
     return df
 
@@ -457,6 +492,10 @@ def main() -> None:
 
     df = pd.DataFrame(rows)
     df = inject_anomalies(df, a.anomaly_ratio, profile_map)
+
+    # Convert USD-scale amounts to PKR (model + UI operate in PKR end-to-end).
+    for col in ("amount", "avg_user_amount", "amount_deviation"):
+        df[col] = (df[col].astype(float) * USD_TO_PKR).round(2)
 
     df["tx_velocity"] = pd.to_numeric(df["tx_velocity"], errors="coerce").fillna(0).clip(lower=0).round().astype(int)
     df["tx_history"] = pd.to_numeric(df["tx_history"], errors="coerce").fillna(0).clip(lower=0).round().astype(int)

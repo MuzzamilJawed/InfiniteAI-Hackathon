@@ -12,7 +12,7 @@ import {
   type TransactionDecision,
 } from "@/lib/api";
 import { usePersona } from "@/components/PersonaPicker";
-import { RiskDecisionModal } from "@/components/RiskDecisionModal";
+import { TransactionResult } from "@/components/TransactionResult";
 import { PersonaBar } from "@/components/PersonaBar";
 
 export default function OnlinePaymentPage() {
@@ -20,7 +20,7 @@ export default function OnlinePaymentPage() {
   const [channel, setChannel] = useState<Channel>("IBFT");
   const [amount, setAmount] = useState("12500");
   const [city, setCity] = useState<City>(persona.defaults.city ?? "Karachi");
-  const [beneficiaryName, setBeneficiaryName] = useState("Sara Khan");
+  const [beneficiaryName, setBeneficiaryName] = useState("Beneficiary");
   const [account, setAccount] = useState("PK36SCBL0000001123456702");
   const [newBeneficiary, setNewBeneficiary] = useState(true);
   const [decision, setDecision] = useState<TransactionDecision | null>(null);
@@ -179,9 +179,9 @@ export default function OnlinePaymentPage() {
         </aside>
       </div>
 
-      <RiskDecisionModal
+      <TransactionResult
         decision={decision}
-        onClose={() => setDecision(null)}
+        onClear={() => setDecision(null)}
       />
     </div>
   );

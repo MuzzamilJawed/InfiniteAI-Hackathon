@@ -9,7 +9,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 
-export type UserRole = "admin" | "analyst" | "customer";
+export type UserRole = "analyst" | "customer";
 
 export interface AuthUser {
   id: string;
@@ -27,39 +27,39 @@ interface AuthContextValue {
 }
 
 const DEMO_USERS: Record<string, { password: string; user: AuthUser }> = {
-  "admin@safebank.pk": {
-    password: "admin123",
-    user: {
-      id: "USR-001",
-      name: "Zaid Hamdan",
-      email: "admin@safebank.pk",
-      role: "admin",
-      avatar: "ZH",
-    },
-  },
-  "analyst@safebank.pk": {
+  "analyst@fraudentify.pk": {
     password: "analyst123",
     user: {
-      id: "USR-002",
-      name: "Aisha Noor",
-      email: "analyst@safebank.pk",
+      id: "USR-001",
+      name: "Analyst",
+      email: "analyst@fraudentify.pk",
       role: "analyst",
-      avatar: "AN",
+      avatar: "A",
     },
   },
-  "customer@safebank.pk": {
+  "customer1@fraudentify.pk": {
+    password: "customer123",
+    user: {
+      id: "USR-002",
+      name: "Customer 1",
+      email: "customer1@fraudentify.pk",
+      role: "customer",
+      avatar: "C1",
+    },
+  },
+  "customer2@fraudentify.pk": {
     password: "customer123",
     user: {
       id: "USR-003",
-      name: "Ali Raza",
-      email: "customer@safebank.pk",
+      name: "Customer 2",
+      email: "customer2@fraudentify.pk",
       role: "customer",
-      avatar: "AR",
+      avatar: "C2",
     },
   },
 };
 
-const STORAGE_KEY = "safebank_auth_v1";
+const STORAGE_KEY = "fraudentify_auth_v1";
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,

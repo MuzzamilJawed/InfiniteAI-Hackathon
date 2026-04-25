@@ -94,10 +94,38 @@ class ReasonCode(BaseModel):
     weight: float
 
 
+EvidenceCategory = Literal[
+    "Amount",
+    "Time",
+    "Location",
+    "Device",
+    "Channel",
+    "Velocity",
+    "Beneficiary",
+    "Compliance",
+    "Behavior",
+    "Model",
+]
+Severity = Literal["info", "low", "medium", "high", "critical"]
+
+
+class Evidence(BaseModel):
+    category: EvidenceCategory
+    severity: Severity
+    title: str
+    detail: str
+    observed: Optional[str] = None
+    expected: Optional[str] = None
+
+
 class Explanation(BaseModel):
     analyst: str
     customer: str
     top_factors: list[str]
+    headline: Optional[str] = None
+    narrative: Optional[str] = None
+    recommended_action: Optional[str] = None
+    evidence: list[Evidence] = []
 
 
 class TransactionDecision(BaseModel):
