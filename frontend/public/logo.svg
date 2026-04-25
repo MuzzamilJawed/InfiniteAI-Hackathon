@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#bg)"/>
+  <path d="M256 80c-80 0-144 24-144 24v168c0 88 64 144 144 168 80-24 144-80 144-168V104s-64-24-144-24z" fill="white" fill-opacity="0.15"/>
+  <path d="M256 104c-68 0-120 20-120 20v144c0 76 52 124 120 144 68-20 120-68 120-144V124s-52-20-120-20z" fill="white" fill-opacity="0.1"/>
+  <text x="256" y="340" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="800" font-size="240" fill="white">F</text>
+</svg>

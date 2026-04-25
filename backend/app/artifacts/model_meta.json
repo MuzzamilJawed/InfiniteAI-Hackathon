@@ -1,0 +1,24 @@
+{
+  "feature_columns": [
+    "amount",
+    "avg_user_amount",
+    "amount_deviation",
+    "amount_ratio",
+    "tx_velocity",
+    "tx_history",
+    "new_beneficiary",
+    "is_holiday",
+    "hour",
+    "is_off_hours",
+    "diff_city",
+    "kyc_risk_weight",
+    "risky_channel",
+    "risky_merchant",
+    "risky_device",
+    "device_trusted"
+  ],
+  "iforest_min": -0.1537402960151123,
+  "iforest_max": 0.19864458481008157,
+  "trained_rows": 12000,
+  "supervised": true
+}
