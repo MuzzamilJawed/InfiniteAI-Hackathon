@@ -17,8 +17,8 @@
     "risky_device",
     "device_trusted"
   ],
-  "iforest_min": -0.1537402960151123,
-  "iforest_max": 0.19864458481008157,
+  "iforest_min": -0.2101004743483017,
+  "iforest_max": 0.19174082652402358,
   "trained_rows": 12000,
   "supervised": true
 }

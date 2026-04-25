@@ -294,88 +294,130 @@ def normal_tx(p: UserProfile, idx: int, total: int, ts: datetime) -> dict:
         "kyc_tier": p.kyc_tier,
         "is_holiday": is_holiday_flag(ts),
         "hour": ts.hour,
+        "account_type": "domestic_only",
+        "is_international": 0,
+        "is_first_time_international": 0,
+        "seconds_since_prev_tx": 0,
+        "scenario_tag": "normal",
         "is_anomaly": 0,
     }
 
 
-def _inject_amount_spike(r: pd.Series, profile: UserProfile | None) -> pd.Series:
-    """Subtype 1: Large amount spike (3-10x baseline)."""
-    avg = float(r["avg_user_amount"])
-    r["amount"] = round(clip(avg * np.random.uniform(3.0, 10.0), 20.0, 25000.0), 2)
-    r["amount_deviation"] = round(float(r["amount"]) - avg, 2)
-    if random.random() < 0.4:
-        r["new_beneficiary"] = 1
+def _coerce_timestamp(value: str) -> datetime:
+    return datetime.fromisoformat(str(value))
+
+
+def _recompute_prev_tx_seconds(df: pd.DataFrame) -> pd.DataFrame:
+    ts = pd.to_datetime(df["timestamp"], errors="coerce")
+    ordered = df.assign(_ts=ts).sort_values(["customer_id", "_ts"]).copy()
+    deltas = ordered.groupby("customer_id")["_ts"].diff().dt.total_seconds().fillna(0)
+    ordered["seconds_since_prev_tx"] = deltas.clip(lower=0).round().astype(int)
+    ordered = ordered.drop(columns=["_ts"])
+    return ordered.sort_index()
+
+
+def _inject_duplicate_within_60s(
+    df: pd.DataFrame, i: int, r: pd.Series, profile: UserProfile | None
+) -> pd.Series:
+    """Scenario 1: Duplicate transaction within 60 seconds, same account."""
+    customer_rows = df.index[df["customer_id"] == r["customer_id"]].tolist()
+    prev_candidates = [idx for idx in customer_rows if idx != i]
+    if prev_candidates:
+        ref_idx = random.choice(prev_candidates)
+        ref = df.loc[ref_idx]
+        try:
+            base_ts = _coerce_timestamp(ref["timestamp"])
+            dup_ts = base_ts + timedelta(seconds=random.randint(5, 60))
+            r["timestamp"] = dup_ts.isoformat()
+            r["hour"] = dup_ts.hour
+        except Exception:
+            pass
+        ref_amount = float(ref["amount"])
+        r["amount"] = round(clip(ref_amount * np.random.uniform(0.97, 1.03), 5.0, 25000.0), 2)
+    r["seconds_since_prev_tx"] = random.randint(5, 60)
+    r["tx_velocity"] = int(max(float(r["tx_velocity"]), np.random.randint(6, 14)))
+    r["new_beneficiary"] = 0
+    r["scenario_tag"] = "duplicate_tx_60s"
+    r["amount_deviation"] = round(float(r["amount"]) - float(r["avg_user_amount"]), 2)
     return r
 
 
-def _inject_location_anomaly(r: pd.Series, profile: UserProfile | None) -> pd.Series:
-    """Subtype 2: Different city + risky device, normal amount."""
+def _inject_amount_5x_avg(
+    df: pd.DataFrame, i: int, r: pd.Series, profile: UserProfile | None
+) -> pd.Series:
+    """Scenario 2: Transaction amount 5x above account's 30-day average."""
+    avg = float(r["avg_user_amount"])
+    r["amount"] = round(clip(avg * np.random.uniform(5.0, 8.0), 20.0, 40000.0), 2)
+    r["amount_deviation"] = round(float(r["amount"]) - avg, 2)
+    r["new_beneficiary"] = 1 if random.random() < 0.45 else int(r["new_beneficiary"])
+    r["scenario_tag"] = "amount_5x_avg_30d"
+    return r
+
+
+def _inject_offhours_high_value(
+    df: pd.DataFrame, i: int, r: pd.Series, profile: UserProfile | None
+) -> pd.Series:
+    """Scenario 3: Off-hours high-value transfer (2AM, PKR 500,000+)."""
+    # Generator operates in USD-scale before conversion (USD -> PKR later).
+    min_usd_for_500k_pkr = 500_000.0 / USD_TO_PKR
+    r["amount"] = round(clip(np.random.uniform(min_usd_for_500k_pkr, 6500.0), min_usd_for_500k_pkr, 25000.0), 2)
+    r["amount_deviation"] = round(float(r["amount"]) - float(r["avg_user_amount"]), 2)
+    r["channel"] = random.choice(["IBFT", "Raast", "App"])
+    r["merchant_category"] = random.choice(["P2P", "Travel", "Others"])
+    r["new_beneficiary"] = 1
+    r["device"] = "new_device" if random.random() < 0.55 else "emulated_device"
+    try:
+        ts = _coerce_timestamp(r["timestamp"]).replace(hour=2, minute=random.randint(0, 59), second=random.randint(0, 59))
+        r["timestamp"] = ts.isoformat()
+        r["hour"] = 2
+    except Exception:
+        r["hour"] = 2
+    r["scenario_tag"] = "offhours_high_value_2am"
+    return r
+
+
+def _inject_rapid_atm_cross_location(
+    df: pd.DataFrame, i: int, r: pd.Series, profile: UserProfile | None
+) -> pd.Series:
+    """Scenario 4: Rapid sequential ATM withdrawals across different locations."""
+    r["channel"] = "ATM"
+    r["merchant_category"] = "Cash"
+    r["tx_velocity"] = int(np.random.randint(10, 30))
+    r["seconds_since_prev_tx"] = random.randint(20, 180)
     if profile is not None:
         other = [c for c in PAKISTAN_CITIES if c != profile.home_city]
         r["city"] = random.choice(other)
         r["location"] = "different_city"
     r["device"] = "new_device" if random.random() < 0.5 else "emulated_device"
-    if random.random() < 0.35:
-        r["channel"] = random.choice(["ATM", "POS"])
+    r["scenario_tag"] = "rapid_atm_multi_location"
     return r
 
 
-def _inject_velocity_burst(r: pd.Series, profile: UserProfile | None) -> pd.Series:
-    """Subtype 3: High velocity burst, possibly off-hours, normal amount."""
-    r["tx_velocity"] = int(np.random.randint(15, 45))
-    if random.random() < 0.65:
-        try:
-            ts = datetime.fromisoformat(str(r["timestamp"]))
-            ts = ts.replace(hour=random.choice([0, 1, 2, 3, 4, 23]))
-            r["timestamp"] = ts.isoformat()
-            r["hour"] = ts.hour
-        except Exception:
-            pass
-    if random.random() < 0.5:
-        r["new_beneficiary"] = 1
-    return r
-
-
-def _inject_channel_device(r: pd.Series, profile: UserProfile | None) -> pd.Series:
-    """Subtype 4: Risky channel + risky device + off-hours, near-normal amount."""
-    r["channel"] = random.choice(["ATM", "P2P", "Cash"])
-    r["device"] = "new_device" if random.random() < 0.55 else "emulated_device"
-    r["merchant_category"] = random.choice(["Cash", "P2P", "Electronics"])
-    try:
-        ts = datetime.fromisoformat(str(r["timestamp"]))
-        ts = ts.replace(hour=random.choice([0, 1, 2, 3, 4, 5, 23]))
-        r["timestamp"] = ts.isoformat()
-        r["hour"] = ts.hour
-    except Exception:
-        pass
+def _inject_first_time_international(
+    df: pd.DataFrame, i: int, r: pd.Series, profile: UserProfile | None
+) -> pd.Series:
+    """Scenario 5: First-time international transaction on domestic-only account."""
     avg = float(r["avg_user_amount"])
-    r["amount"] = round(clip(avg * np.random.uniform(0.8, 1.5), 5.0, 8000.0), 2)
+    r["amount"] = round(clip(avg * np.random.uniform(2.5, 5.0), 30.0, 20000.0), 2)
     r["amount_deviation"] = round(float(r["amount"]) - avg, 2)
-    return r
-
-
-def _inject_behavioral_drift(r: pd.Series, profile: UserProfile | None) -> pd.Series:
-    """Subtype 5: Multiple moderate signals — slightly elevated amount + diff city + new beneficiary."""
-    avg = float(r["avg_user_amount"])
-    r["amount"] = round(clip(avg * np.random.uniform(1.5, 2.8), 10.0, 12000.0), 2)
-    r["amount_deviation"] = round(float(r["amount"]) - avg, 2)
+    r["account_type"] = "domestic_only"
+    r["is_international"] = 1
+    r["is_first_time_international"] = 1
     r["new_beneficiary"] = 1
-    if profile is not None and random.random() < 0.6:
-        other = [c for c in PAKISTAN_CITIES if c != profile.home_city]
-        r["city"] = random.choice(other)
-        r["location"] = "different_city"
-    if random.random() < 0.45:
-        r["device"] = "new_device"
-    r["tx_velocity"] = int(max(float(r["tx_velocity"]), np.random.randint(6, 15)))
+    r["channel"] = random.choice(["IBFT", "Card", "App"])
+    r["merchant_category"] = random.choice(["Travel", "Electronics", "Others"])
+    r["device"] = "new_device"
+    r["tx_velocity"] = int(max(float(r["tx_velocity"]), np.random.randint(4, 12)))
+    r["scenario_tag"] = "first_time_international"
     return r
 
 
 ANOMALY_SUBTYPES = [
-    (_inject_amount_spike, 0.25),
-    (_inject_location_anomaly, 0.20),
-    (_inject_velocity_burst, 0.20),
-    (_inject_channel_device, 0.20),
-    (_inject_behavioral_drift, 0.15),
+    (_inject_duplicate_within_60s, 0.22),
+    (_inject_amount_5x_avg, 0.20),
+    (_inject_offhours_high_value, 0.20),
+    (_inject_rapid_atm_cross_location, 0.20),
+    (_inject_first_time_international, 0.18),
 ]
 
 
@@ -392,8 +434,9 @@ def inject_anomalies(df: pd.DataFrame, ratio: float, profiles: dict[int, UserPro
         r = df.loc[i].copy()
         uid = int(r["user_id"])
         profile = profiles.get(uid)
-        r = fns[st](r, profile)
+        r = fns[st](df, i, r, profile)
         df.loc[i] = r
+    df = _recompute_prev_tx_seconds(df)
     return df
 
 
@@ -438,8 +481,8 @@ def write_md(s: dict, out: Path) -> None:
         "",
         "## How Anomalies Were Generated",
         "- 8% anomalies injected by default (configurable 5-10%).",
-        "- Fraud patterns: 3x-10x amount spikes, velocity bursts, off-hours timestamps, channel-shift to ATM/P2P/Cash, new beneficiary, risky devices, different-city.",
-        "- Subset of users receives behavioral drift in baseline amount and device behavior.",
+        "- Fraud scenarios: duplicate tx within 60s, 5x amount vs avg, 2AM transfer above PKR 500,000, rapid ATM withdrawals across locations, first-time international on domestic-only account.",
+        "- Scenario tags are exported in `scenario_tag` with supporting flags (`seconds_since_prev_tx`, `is_international`, `is_first_time_international`).",
         "",
         "## Pakistan-Localized Fields",
         "- `timestamp`: ISO datetime spanning the configured date range.",
@@ -491,6 +534,7 @@ def main() -> None:
             rows.append(normal_tx(p, i, int(c), ts))
 
     df = pd.DataFrame(rows)
+    df = _recompute_prev_tx_seconds(df)
     df = inject_anomalies(df, a.anomaly_ratio, profile_map)
 
     # Convert USD-scale amounts to PKR (model + UI operate in PKR end-to-end).
@@ -530,6 +574,11 @@ def main() -> None:
         "kyc_tier",
         "is_holiday",
         "hour",
+        "account_type",
+        "is_international",
+        "is_first_time_international",
+        "seconds_since_prev_tx",
+        "scenario_tag",
     ]
     if a.include_label:
         export_cols.append("is_anomaly")
