@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f0f2fa;
+  --foreground: #0d1229;
+  --brand: #4338ca;
+  --brand-soft: #6366f1;
+  --gold: #f59e0b;
+  --surface: #ffffff;
+  --surface-muted: #eceef8;
+  --danger: #dc2626;
+  --warning: #d97706;
+  --info: #0891b2;
+  --border: #d4d8f0;
+  --accent: #06b6d4;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-gold: var(--gold);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #07091a;
+    --foreground: #e4e7f8;
+    --brand: #818cf8;
+    --brand-soft: #6366f1;
+    --gold: #fbbf24;
+    --surface: #0d1030;
+    --surface-muted: #111638;
+    --border: #1e2550;
+    --accent: #22d3ee;
+  }
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+.glass {
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.brand-gradient {
+  background: linear-gradient(135deg, #4338ca 0%, #6366f1 55%, #06b6d4 100%);
+}
+
+.brand-text-gradient {
+  background: linear-gradient(135deg, #4338ca, #6366f1, #06b6d4);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.card-shadow {
+  box-shadow: 0 16px 40px -16px rgba(67, 56, 202, 0.18);
+}
+
+.fade-in {
+  animation: fadeIn 0.45s ease both;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--brand) 40%, transparent);
+  border-radius: 8px;
+}
